@@ -217,14 +217,24 @@ function saveProductData(productData) {
  */
 function initCluster() {
     return __awaiter(this, void 0, void 0, function () {
-        var executablePath, chromiumArgs, defaultViewport_1, err_2;
+        var executablePath, chromiumArgs, defaultViewport_1, isProd, err_2;
         var _this = this;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     if (clusterInstance)
                         return [2 /*return*/, clusterInstance];
-                    chromiumArgs = ["--no-sandbox", "--disable-setuid-sandbox"];
+                    chromiumArgs = [
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                        "--disable-background-timer-throttling",
+                        "--disable-renderer-backgrounding",
+                        "--disable-backgrounding-occluded-windows",
+                        "--disable-extensions",
+                        "--single-process",
+                    ];
                     if (!(process.env.NODE_ENV === "production")) return [3 /*break*/, 2];
                     return [4 /*yield*/, chromium.executablePath()];
                 case 1:
@@ -251,15 +261,25 @@ function initCluster() {
                 case 8:
                     _a.trys.push([8, 11, 12, 13]);
                     defaultViewport_1 = { width: 1280, height: 900 };
+                    isProd = process.env.NODE_ENV === "production";
                     return [4 /*yield*/, puppeteer_cluster_1.Cluster.launch({
-                            concurrency: puppeteer_cluster_1.Cluster.CONCURRENCY_PAGE,
-                            maxConcurrency: CLUSTER_CONCURRENCY,
+                            concurrency: isProd ? puppeteer_cluster_1.Cluster.CONCURRENCY_PAGE : puppeteer_cluster_1.Cluster.CONCURRENCY_PAGE, // use PAGE even on Render
+                            maxConcurrency: isProd ? 1 : CLUSTER_CONCURRENCY,
                             puppeteer: puppeteerCore,
                             puppeteerOptions: {
-                                headless: HEADLESS,
+                                headless: true,
                                 executablePath: executablePath,
-                                args: chromiumArgs,
-                                userDataDir: userDataDir,
+                                args: [
+                                    "--no-sandbox",
+                                    "--disable-setuid-sandbox",
+                                    "--disable-dev-shm-usage",
+                                    "--disable-gpu",
+                                    "--disable-software-rasterizer",
+                                    "--no-zygote",
+                                    "--no-first-run",
+                                    "--no-default-browser-check",
+                                ],
+                                dumpio: false,
                             },
                             timeout: NAV_TIMEOUT * 2,
                             monitor: false,
@@ -301,14 +321,20 @@ function initCluster() {
                                         return [3 /*break*/, 8];
                                     case 8:
                                         _c.trys.push([8, 10, , 12]);
-                                        return [4 /*yield*/, page.goto(url, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT })];
+                                        return [4 /*yield*/, page.goto(url, {
+                                                waitUntil: "networkidle2",
+                                                timeout: NAV_TIMEOUT,
+                                            })];
                                     case 9:
                                         _c.sent();
                                         return [3 /*break*/, 12];
                                     case 10:
                                         e_2 = _c.sent();
                                         console.warn("[task] goto failed, retrying:", e_2.message);
-                                        return [4 /*yield*/, page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT })];
+                                        return [4 /*yield*/, page.goto(url, {
+                                                waitUntil: "domcontentloaded",
+                                                timeout: NAV_TIMEOUT,
+                                            })];
                                     case 11:
                                         _c.sent();
                                         return [3 /*break*/, 12];
@@ -318,10 +344,14 @@ function initCluster() {
                                         _c.label = 13;
                                     case 13:
                                         _c.trys.push([13, 21, , 22]);
-                                        return [4 /*yield*/, page.waitForSelector('[data-testid="country-select"]', { timeout: 10000 })];
+                                        return [4 /*yield*/, page.waitForSelector('[data-testid="country-select"]', {
+                                                timeout: 10000,
+                                            })];
                                     case 14:
                                         _c.sent();
-                                        return [4 /*yield*/, page.waitForSelector('[data-testid="country-select-btn"]', { timeout: 10000 })];
+                                        return [4 /*yield*/, page.waitForSelector('[data-testid="country-select-btn"]', {
+                                                timeout: 10000,
+                                            })];
                                     case 15:
                                         _c.sent();
                                         return [4 /*yield*/, page.select('[data-testid="country-select"]', "United Arab Emirates")];
@@ -333,7 +363,10 @@ function initCluster() {
                                         _c.sent();
                                         console.log("[task] Clicked Select button...");
                                         // Wait for redirect after selection
-                                        return [4 /*yield*/, page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 })];
+                                        return [4 /*yield*/, page.waitForNavigation({
+                                                waitUntil: "networkidle2",
+                                                timeout: 30000,
+                                            })];
                                     case 18:
                                         // Wait for redirect after selection
                                         _c.sent();
@@ -376,13 +409,12 @@ function initCluster() {
                                                     return el ? el.textContent.trim() : null;
                                                 };
                                                 var title = getText("h1.pr-new-br, h1.product-title, h1");
-                                                var salePrice = getText("div.pr-bx-nm span.prc-slg, div.p-sale-price");
+                                                var salePrice = getText("div.pr-bx-nm span.prc-slg, div.p-strikethrough-price");
                                                 var seller = getText("div.store-link-header, div.merchant-name, .merchant, a[href*='/sellers/']") || getText("a.store-link");
                                                 return { title: title, salePrice: salePrice, seller: seller, url: window.location.href };
                                             })];
                                     case 23:
                                         result = _c.sent();
-                                        console.log("[task] RESULT:", result);
                                         return [2 /*return*/, result];
                                 }
                             });

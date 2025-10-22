@@ -141,7 +141,6 @@ async function saveProductData(productData) {
   );
 }
 
-
 /**
  * Initialize Puppeteer Cluster using puppeteer-core + @sparticuz/chromium-min
  * Compatible with Render, Railway, Vercel, etc.
@@ -151,7 +150,18 @@ async function initCluster() {
   if (clusterInstance) return clusterInstance;
 
   let executablePath: string;
-  let chromiumArgs = ["--no-sandbox", "--disable-setuid-sandbox"];
+  // let chromiumArgs = ["--no-sandbox", "--disable-setuid-sandbox"];
+  let chromiumArgs = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--disable-background-timer-throttling",
+    "--disable-renderer-backgrounding",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-extensions",
+    "--single-process",
+  ];
 
   if (process.env.NODE_ENV === "production") {
     executablePath = await chromium.executablePath();
@@ -171,15 +181,39 @@ async function initCluster() {
   try {
     const defaultViewport = { width: 1280, height: 900 };
 
+    // clusterInstance = await Cluster.launch({
+    //   concurrency: Cluster.CONCURRENCY_PAGE,
+    //   maxConcurrency: CLUSTER_CONCURRENCY,
+    //   puppeteer: puppeteerCore,
+    //   puppeteerOptions: {
+    //     headless: HEADLESS,
+    //     executablePath,
+    //     args: chromiumArgs,
+    //     userDataDir,
+    //   },
+    //   timeout: NAV_TIMEOUT * 2,
+    //   monitor: false,
+    // });
+    const isProd = process.env.NODE_ENV === "production";
+
     clusterInstance = await Cluster.launch({
-      concurrency: Cluster.CONCURRENCY_PAGE,
-      maxConcurrency: CLUSTER_CONCURRENCY,
+      concurrency: isProd ? Cluster.CONCURRENCY_PAGE : Cluster.CONCURRENCY_PAGE, // use PAGE even on Render
+      maxConcurrency: isProd ? 1 : CLUSTER_CONCURRENCY,
       puppeteer: puppeteerCore,
       puppeteerOptions: {
-        headless: HEADLESS, 
+        headless: true,
         executablePath,
-        args: chromiumArgs,
-        userDataDir,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--disable-software-rasterizer",
+          "--no-zygote",
+          "--no-first-run",
+          "--no-default-browser-check",
+        ],
+        dumpio: false,
       },
       timeout: NAV_TIMEOUT * 2,
       monitor: false,
@@ -207,31 +241,53 @@ async function initCluster() {
       }
 
       try {
-        await page.goto(url, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT });
+        await page.goto(url, {
+          waitUntil: "networkidle2",
+          timeout: NAV_TIMEOUT,
+        });
       } catch (e: any) {
         console.warn("[task] goto failed, retrying:", e.message);
-        await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
+        await page.goto(url, {
+          waitUntil: "domcontentloaded",
+          timeout: NAV_TIMEOUT,
+        });
       }
 
       if (page.url().includes("/select-country")) {
-        console.log("[task] Detected /select-country page — auto-selecting UAE...");
+        console.log(
+          "[task] Detected /select-country page — auto-selecting UAE..."
+        );
 
         try {
-          await page.waitForSelector('[data-testid="country-select"]', { timeout: 10000 });
-          await page.waitForSelector('[data-testid="country-select-btn"]', { timeout: 10000 });
+          await page.waitForSelector('[data-testid="country-select"]', {
+            timeout: 10000,
+          });
+          await page.waitForSelector('[data-testid="country-select-btn"]', {
+            timeout: 10000,
+          });
 
-          await page.select('[data-testid="country-select"]', "United Arab Emirates");
+          await page.select(
+            '[data-testid="country-select"]',
+            "United Arab Emirates"
+          );
           console.log("[task] Selected United Arab Emirates");
 
           await page.click('[data-testid="country-select-btn"]');
           console.log("[task] Clicked Select button...");
 
           // Wait for redirect after selection
-          await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 });
+          await page.waitForNavigation({
+            waitUntil: "networkidle2",
+            timeout: 30000,
+          });
 
           // Save cookies for future sessions
           const cookies = await page.cookies();
-          fs.writeFileSync(cookiesPath, JSON.stringify(cookies, null, 2), "utf8");
+          fs.writeFileSync(
+            cookiesPath,
+            JSON.stringify(cookies, null, 2),
+            "utf8"
+          );
           console.log("[task] UAE selected & cookies saved.");
 
           // Reload original product page
@@ -259,7 +315,9 @@ async function initCluster() {
         };
 
         const title = getText("h1.pr-new-br, h1.product-title, h1");
-        const salePrice = getText("div.pr-bx-nm span.prc-slg, div.p-sale-price");
+        const salePrice = getText(
+          "div.pr-bx-nm span.prc-slg, div.p-strikethrough-price"
+        );
         const seller =
           getText(
             "div.store-link-header, div.merchant-name, .merchant, a[href*='/sellers/']"
@@ -268,7 +326,6 @@ async function initCluster() {
         return { title, salePrice, seller, url: window.location.href };
       });
 
-      console.log("[task] RESULT:", result);
       return result;
     });
 
@@ -289,8 +346,6 @@ async function initCluster() {
     clusterInitInProgress = false;
   }
 }
-
-
 
 /*
 // async function initCluster() {
@@ -803,10 +858,7 @@ async function scheduledJob() {
     const results = await processProducts(products, {
       maxToProcess: BATCH_SIZE,
     });
-    console.log(
-      `[scheduler] processed ${results.length} items:`,
-      results
-    );
+    console.log(`[scheduler] processed ${results.length} items:`, results);
 
     // --- Update MongoDB with scraped results ---
     for (const r of results) {
@@ -903,9 +955,6 @@ cron.schedule("*/60 * * * *", async () => {
   await fetchAndStoreTrendyolProducts();
 });
 
-
-
-
 // (async () => {
 //   const browser = await puppeteer.launch({
 //     headless: false, // Keep it visible for manual actions
@@ -957,7 +1006,6 @@ cron.schedule("*/60 * * * *", async () => {
 //   await browser.close();
 //   // process.exit(0);
 // })();
-
 
 // Export module API
 module.exports = {

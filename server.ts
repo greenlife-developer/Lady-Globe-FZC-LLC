@@ -26,6 +26,7 @@ app.use(cors({
       "http://localhost:8080",
       "http://localhost:4000",
       "https://lady-globe-fzc-llc.onrender.com",
+      "https://lady-globe-fzc-llc-tyn6.onrender.com/",
     ];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
