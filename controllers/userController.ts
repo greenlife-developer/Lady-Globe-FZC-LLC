@@ -86,8 +86,8 @@ const loginUser = async (req: Request, res: Response) => {
     res.cookie("token", token, {
       path: "/",
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      secure: true,
+      sameSite: "none",
       expires: new Date(Date.now() + 86400 * 1000), // 1 day
     } as any);
 

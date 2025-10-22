@@ -133,8 +133,8 @@ var loginUser = function (req, res) { return __awaiter(void 0, void 0, void 0, f
                 res.cookie("token", token, {
                     path: "/",
                     httpOnly: true,
-                    secure: false,
-                    sameSite: "lax",
+                    secure: true,
+                    sameSite: "none",
                     expires: new Date(Date.now() + 86400 * 1000), // 1 day
                 });
                 res.status(200).json({ message: "Login successful", user: user, status: 200 });
