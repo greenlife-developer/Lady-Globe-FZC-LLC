@@ -320,46 +320,51 @@ function initCluster() {
                                         console.warn("[task] failed to set cookies:", e_1.message);
                                         return [3 /*break*/, 8];
                                     case 8:
-                                        _c.trys.push([8, 10, , 12]);
+                                        _c.trys.push([8, 11, , 13]);
                                         return [4 /*yield*/, page.goto(url, {
                                                 waitUntil: "networkidle2",
                                                 timeout: NAV_TIMEOUT,
                                             })];
                                     case 9:
                                         _c.sent();
-                                        return [3 /*break*/, 12];
+                                        // add delay of 3 seconds to allow any dynamic content to load
+                                        return [4 /*yield*/, sleep(3000)];
                                     case 10:
+                                        // add delay of 3 seconds to allow any dynamic content to load
+                                        _c.sent();
+                                        return [3 /*break*/, 13];
+                                    case 11:
                                         e_2 = _c.sent();
                                         console.warn("[task] goto failed, retrying:", e_2.message);
                                         return [4 /*yield*/, page.goto(url, {
                                                 waitUntil: "domcontentloaded",
                                                 timeout: NAV_TIMEOUT,
                                             })];
-                                    case 11:
-                                        _c.sent();
-                                        return [3 /*break*/, 12];
                                     case 12:
-                                        if (!page.url().includes("/select-country")) return [3 /*break*/, 22];
-                                        console.log("[task] Detected /select-country page — auto-selecting UAE...");
-                                        _c.label = 13;
-                                    case 13:
-                                        _c.trys.push([13, 21, , 22]);
-                                        return [4 /*yield*/, page.waitForSelector('[data-testid="country-select"]', {
-                                                timeout: 10000,
-                                            })];
-                                    case 14:
                                         _c.sent();
-                                        return [4 /*yield*/, page.waitForSelector('[data-testid="country-select-btn"]', {
+                                        return [3 /*break*/, 13];
+                                    case 13:
+                                        if (!page.url().includes("/select-country")) return [3 /*break*/, 23];
+                                        console.log("[task] Detected /select-country page — auto-selecting UAE...");
+                                        _c.label = 14;
+                                    case 14:
+                                        _c.trys.push([14, 22, , 23]);
+                                        return [4 /*yield*/, page.waitForSelector('[data-testid="country-select"]', {
                                                 timeout: 10000,
                                             })];
                                     case 15:
                                         _c.sent();
-                                        return [4 /*yield*/, page.select('[data-testid="country-select"]', "United Arab Emirates")];
+                                        return [4 /*yield*/, page.waitForSelector('[data-testid="country-select-btn"]', {
+                                                timeout: 10000,
+                                            })];
                                     case 16:
+                                        _c.sent();
+                                        return [4 /*yield*/, page.select('[data-testid="country-select"]', "United Arab Emirates")];
+                                    case 17:
                                         _c.sent();
                                         console.log("[task] Selected United Arab Emirates");
                                         return [4 /*yield*/, page.click('[data-testid="country-select-btn"]')];
-                                    case 17:
+                                    case 18:
                                         _c.sent();
                                         console.log("[task] Clicked Select button...");
                                         // Wait for redirect after selection
@@ -367,25 +372,25 @@ function initCluster() {
                                                 waitUntil: "networkidle2",
                                                 timeout: 30000,
                                             })];
-                                    case 18:
+                                    case 19:
                                         // Wait for redirect after selection
                                         _c.sent();
                                         return [4 /*yield*/, page.cookies()];
-                                    case 19:
+                                    case 20:
                                         cookies = _c.sent();
                                         fs.writeFileSync(cookiesPath, JSON.stringify(cookies, null, 2), "utf8");
                                         console.log("[task] UAE selected & cookies saved.");
                                         // Reload original product page
                                         return [4 /*yield*/, page.goto(url, { waitUntil: "networkidle2" })];
-                                    case 20:
+                                    case 21:
                                         // Reload original product page
                                         _c.sent();
-                                        return [3 /*break*/, 22];
-                                    case 21:
+                                        return [3 /*break*/, 23];
+                                    case 22:
                                         err_3 = _c.sent();
                                         console.error("[task] Auto-select UAE failed:", err_3.message || err_3);
                                         return [2 /*return*/, false];
-                                    case 22:
+                                    case 23:
                                         // Handle unexpected redirects
                                         page.on("framenavigated", function (frame) { return __awaiter(_this, void 0, void 0, function () {
                                             var u;
@@ -413,7 +418,7 @@ function initCluster() {
                                                 var seller = getText("div.store-link-header, div.merchant-name, .merchant, a[href*='/sellers/']") || getText("a.store-link");
                                                 return { title: title, salePrice: salePrice, seller: seller, url: window.location.href };
                                             })];
-                                    case 23:
+                                    case 24:
                                         result = _c.sent();
                                         return [2 /*return*/, result];
                                 }
@@ -454,167 +459,6 @@ function initCluster() {
         });
     });
 }
-/*
-// async function initCluster() {
-//   if (clusterInstance) return clusterInstance;
-
-//   if (clusterInitInProgress) {
-//     while (clusterInitInProgress && !clusterInstance) await sleep(200);
-//     return clusterInstance!;
-//   }
-
-//   clusterInitInProgress = true;
-//   console.log("[scraper] Initializing Puppeteer Cluster...");
-
-//   try {
-//     const defaultViewport = { width: 1280, height: 900 };
-
-//     // ----- 1️⃣ Configure environment-specific Chrome setup -----
-//     const isProd = process.env.NODE_ENV === "production";
-
-//     const chromiumArgs = [
-//       "--no-sandbox",
-//       "--disable-setuid-sandbox",
-//       "--disable-dev-shm-usage", // avoids /dev/shm crashes
-//       "--disable-gpu",
-//       "--disable-background-timer-throttling",
-//       "--disable-renderer-backgrounding",
-//       "--disable-backgrounding-occluded-windows",
-//       "--disable-extensions",
-//       "--single-process",
-//     ];
-
-//     let executablePath: string;
-//     if (isProd) {
-//       // Render / Server
-//       executablePath =
-//         process.env.PUPPETEER_EXECUTABLE_PATH ||
-//         process.env.CHROME_BIN ||
-//         (await chromium.executablePath());
-//     } else {
-//       // Local dev uses full Puppeteer
-//       executablePath = puppeteer.executablePath();
-//     }
-
-//     // ----- 2️⃣ Launch Puppeteer Cluster -----
-//     clusterInstance = await Cluster.launch({
-//       concurrency: isProd
-//         ? Cluster.CONCURRENCY_CONTEXT // safer in container
-//         : Cluster.CONCURRENCY_PAGE,   // faster in dev
-//       maxConcurrency: isProd ? 2 : CLUSTER_CONCURRENCY,
-//       puppeteer: puppeteerCore,
-//       puppeteerOptions: {
-//         headless: isProd ? true : HEADLESS,
-//         executablePath,
-//         args: chromiumArgs,
-//         userDataDir,
-//         dumpio: false,
-//       },
-//       timeout: NAV_TIMEOUT * 2,
-//       monitor: false,
-//       retryLimit: 2,
-//       retryDelay: 5000,
-//     });
-
-//     // ----- 3️⃣ Define cluster task -----
-//     await clusterInstance.task(async ({ page, data: { url } }) => {
-//       page.setDefaultNavigationTimeout(NAV_TIMEOUT);
-
-//       await page.setUserAgent(
-//         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
-//       );
-//       await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
-//       await page.setViewport(defaultViewport);
-
-//       // --- Load cookies ---
-//       try {
-//         if (fs.existsSync(cookiesPath)) {
-//           const cookies = JSON.parse(fs.readFileSync(cookiesPath, "utf8"));
-//           if (Array.isArray(cookies) && cookies.length) {
-//             await page.setCookie(...cookies);
-//           }
-//         }
-//       } catch (e) {
-//         console.warn("[task] failed to set cookies:", (e as any).message);
-//       }
-
-//       // --- Safe navigation ---
-//       const tryGoto = async () => {
-//         try {
-//           await page.goto(url, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT });
-//         } catch (e) {
-//           console.warn("[task] goto failed, retrying with domcontentloaded:", e.message);
-//           await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT * 2 });
-//         }
-//       };
-//       await tryGoto();
-
-//       // --- Auto-select UAE if needed ---
-//       if (page.url().includes("/select-country")) {
-//         console.log("[task] Detected /select-country page — auto-selecting UAE...");
-//         try {
-//           await page.waitForSelector('[data-testid="country-select"]', { timeout: 10000 });
-//           await page.waitForSelector('[data-testid="country-select-btn"]', { timeout: 10000 });
-
-//           await page.select('[data-testid="country-select"]', "United Arab Emirates");
-//           await page.click('[data-testid="country-select-btn"]');
-//           await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 });
-
-//           const cookies = await page.cookies();
-//           fs.writeFileSync(cookiesPath, JSON.stringify(cookies, null, 2), "utf8");
-//           console.log("[task] UAE selected & cookies saved.");
-
-//           await tryGoto();
-//         } catch (err: any) {
-//           console.error("[task] Auto-select UAE failed:", err.message);
-//           return false;
-//         }
-//       }
-
-//       // --- Handle redirects ---
-//       page.on("framenavigated", async (frame) => {
-//         const u = frame.url();
-//         if (u.includes("partner.trendyol.com")) {
-//           console.warn("[task] Redirect detected; navigating back.");
-//           await tryGoto();
-//         }
-//       });
-
-//       // --- Extract product data ---
-//       const result = await page.evaluate(() => {
-//         const getText = (sel) => {
-//           const el = document.querySelector(sel);
-//           return el ? el.textContent.trim() : null;
-//         };
-//         const title = getText("h1.pr-new-br, h1.product-title, h1");
-//         const salePrice = getText("div.pr-bx-nm span.prc-slg, div.p-strikethrough-price");
-//         const seller =
-//           getText("div.store-link-header, div.merchant-name, .merchant, a[href*='/sellers/']") ||
-//           getText("a.store-link");
-//         return { title, salePrice, seller, url: window.location.href };
-//       });
-
-//       return result;
-//     });
-
-//     // ----- Graceful shutdown -----
-//     process.on("SIGINT", async () => {
-//       console.log("[scraper] SIGINT — closing cluster...");
-//       if (clusterInstance) await clusterInstance.close();
-//       process.exit(0);
-//     });
-
-//     console.log("[scraper] Puppeteer Cluster initialized.");
-//     return clusterInstance;
-//   } catch (err) {
-//     clusterInitInProgress = false;
-//     console.error("[initCluster] Failed to launch cluster:", err);
-//     throw err;
-//   } finally {
-//     clusterInitInProgress = false;
-//   }
-// }
-*/
 function scrapeProductWithCluster(url) {
     return __awaiter(this, void 0, void 0, function () {
         var cluster, result, err_4;
@@ -654,8 +498,8 @@ function processProducts(products, opts) {
                     return [4 /*yield*/, ExcludedProducts_1.default.find({}, "productCode").lean()];
                 case 1:
                     excludedProducts = _b.sent();
-                    excludedCodes = new Set(excludedProducts.map(function (p) { return p.productCode; }));
-                    filteredProducts = products.filter(function (p) { return !excludedCodes.has(p.productCode); });
+                    excludedCodes = new Set(excludedProducts.map(function (p) { return String(p.productCode).trim().toLowerCase(); }));
+                    filteredProducts = products.filter(function (p) { return !excludedCodes.has(String(p.productCode).trim().toLowerCase()); });
                     if (filteredProducts.length === 0) {
                         console.log("[processProducts] No products left after exclusion — exiting early.");
                         return [2 /*return*/, []];
@@ -987,12 +831,12 @@ function fetchAndStoreTrendyolProducts() {
 // Cron job: runs every CRON_SCHEDULE (default every 5 minutes).
 function scheduledJob() {
     return __awaiter(this, void 0, void 0, function () {
-        var data, products, results, _i, results_1, r, competitivePrice, err_13, e_4;
+        var data, products, results, _i, results_1, r, newProduct, existingProduct, competitivePrice, err_13, e_4;
         var _a, _b, _c, _d;
         return __generator(this, function (_e) {
             switch (_e.label) {
                 case 0:
-                    _e.trys.push([0, 11, , 12]);
+                    _e.trys.push([0, 12, , 13]);
                     console.log("[scheduler] scheduled job started at", new Date().toISOString());
                     return [4 /*yield*/, trendyol.get("/integration/product/sellers/".concat(SELLER_ID, "/products"), { params: { page: 0, size: 5000, onSale: true } })];
                 case 1:
@@ -1011,13 +855,13 @@ function scheduledJob() {
                     _i = 0, results_1 = results;
                     _e.label = 3;
                 case 3:
-                    if (!(_i < results_1.length)) return [3 /*break*/, 10];
+                    if (!(_i < results_1.length)) return [3 /*break*/, 11];
                     r = results_1[_i];
                     _e.label = 4;
                 case 4:
-                    _e.trys.push([4, 8, , 9]);
+                    _e.trys.push([4, 9, , 10]);
                     if (!r || !r.productCode)
-                        return [3 /*break*/, 9]; // skip invalid results
+                        return [3 /*break*/, 10]; // skip invalid results
                     return [4 /*yield*/, Product_1.default.findOneAndUpdate({ productCode: r.productCode }, // or productCode, depending on your ID mapping
                         {
                             $set: {
@@ -1032,43 +876,43 @@ function scheduledJob() {
                             },
                         }, { new: true })];
                 case 5:
-                    _e.sent();
+                    newProduct = _e.sent();
                     if (!(r.buyBox !== "Yes" &&
                         r.barcode &&
                         r.salePrice &&
-                        r.error === null)) return [3 /*break*/, 7];
-                    competitivePrice = Number((r.salePrice - 0.1).toFixed(2));
-                    console.log("[scheduler] updating price for productCode=".concat(r.productCode, ", sku=").concat(r.sku, " to ").concat(competitivePrice));
-                    // barcode,
-                    // newPrice,
-                    // quantity,
-                    // product_id,
-                    // productCode
-                    return [4 /*yield*/, handleUpdatePrice(r.barcode, competitivePrice, r.quantity, r._id, r.productCode)];
+                        r.error === null &&
+                        r.merchant !== "Unknown")) return [3 /*break*/, 8];
+                    return [4 /*yield*/, Product_1.default.findOne({
+                            productCode: r.productCode,
+                        }).lean()];
                 case 6:
-                    // barcode,
-                    // newPrice,
-                    // quantity,
-                    // product_id,
-                    // productCode
+                    existingProduct = _e.sent();
+                    if (!existingProduct || !existingProduct.salePrice) {
+                        console.warn("[scheduler] No existing product or price found for ".concat(r.productCode));
+                        return [3 /*break*/, 10];
+                    }
+                    competitivePrice = Number((existingProduct.salePrice * 0.9).toFixed(2));
+                    console.log("[scheduler] updating price for productCode=".concat(r.productCode, ", sku=").concat(r.sku, " from ").concat(existingProduct.salePrice, " \u2192 ").concat(competitivePrice));
+                    return [4 /*yield*/, handleUpdatePrice(r.barcode, competitivePrice, r.quantity, r._id, r.productCode)];
+                case 7:
                     _e.sent();
-                    _e.label = 7;
-                case 7: return [3 /*break*/, 9];
-                case 8:
+                    _e.label = 8;
+                case 8: return [3 /*break*/, 10];
+                case 9:
                     err_13 = _e.sent();
                     console.error("[scraper] failed to update product ".concat(r.productId, ":"), err_13.message);
-                    return [3 /*break*/, 9];
-                case 9:
+                    return [3 /*break*/, 10];
+                case 10:
                     _i++;
                     return [3 /*break*/, 3];
-                case 10:
-                    console.log("[scraper] updated ".concat(results.length, " scraped products in MongoDB."));
-                    return [3 /*break*/, 12];
                 case 11:
+                    console.log("[scraper] updated ".concat(results.length, " scraped products in MongoDB."));
+                    return [3 /*break*/, 13];
+                case 12:
                     e_4 = _e.sent();
                     console.error("[scheduler] failed:", e_4.message || e_4);
-                    return [3 /*break*/, 12];
-                case 12: return [2 /*return*/];
+                    return [3 /*break*/, 13];
+                case 13: return [2 /*return*/];
             }
         });
     });

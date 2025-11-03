@@ -245,6 +245,8 @@ async function initCluster() {
           waitUntil: "networkidle2",
           timeout: NAV_TIMEOUT,
         });
+        // add delay of 3 seconds to allow any dynamic content to load
+        await sleep(3000);
       } catch (e: any) {
         console.warn("[task] goto failed, retrying:", e.message);
         await page.goto(url, {
@@ -347,168 +349,6 @@ async function initCluster() {
   }
 }
 
-/*
-// async function initCluster() {
-//   if (clusterInstance) return clusterInstance;
-
-//   if (clusterInitInProgress) {
-//     while (clusterInitInProgress && !clusterInstance) await sleep(200);
-//     return clusterInstance!;
-//   }
-
-//   clusterInitInProgress = true;
-//   console.log("[scraper] Initializing Puppeteer Cluster...");
-
-//   try {
-//     const defaultViewport = { width: 1280, height: 900 };
-
-//     // ----- 1️⃣ Configure environment-specific Chrome setup -----
-//     const isProd = process.env.NODE_ENV === "production";
-
-//     const chromiumArgs = [
-//       "--no-sandbox",
-//       "--disable-setuid-sandbox",
-//       "--disable-dev-shm-usage", // avoids /dev/shm crashes
-//       "--disable-gpu",
-//       "--disable-background-timer-throttling",
-//       "--disable-renderer-backgrounding",
-//       "--disable-backgrounding-occluded-windows",
-//       "--disable-extensions",
-//       "--single-process",
-//     ];
-
-//     let executablePath: string;
-//     if (isProd) {
-//       // Render / Server
-//       executablePath =
-//         process.env.PUPPETEER_EXECUTABLE_PATH ||
-//         process.env.CHROME_BIN ||
-//         (await chromium.executablePath());
-//     } else {
-//       // Local dev uses full Puppeteer
-//       executablePath = puppeteer.executablePath();
-//     }
-
-//     // ----- 2️⃣ Launch Puppeteer Cluster -----
-//     clusterInstance = await Cluster.launch({
-//       concurrency: isProd
-//         ? Cluster.CONCURRENCY_CONTEXT // safer in container
-//         : Cluster.CONCURRENCY_PAGE,   // faster in dev
-//       maxConcurrency: isProd ? 2 : CLUSTER_CONCURRENCY,
-//       puppeteer: puppeteerCore,
-//       puppeteerOptions: {
-//         headless: isProd ? true : HEADLESS,
-//         executablePath,
-//         args: chromiumArgs,
-//         userDataDir,
-//         dumpio: false,
-//       },
-//       timeout: NAV_TIMEOUT * 2,
-//       monitor: false,
-//       retryLimit: 2,
-//       retryDelay: 5000,
-//     });
-
-//     // ----- 3️⃣ Define cluster task -----
-//     await clusterInstance.task(async ({ page, data: { url } }) => {
-//       page.setDefaultNavigationTimeout(NAV_TIMEOUT);
-
-//       await page.setUserAgent(
-//         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
-//       );
-//       await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
-//       await page.setViewport(defaultViewport);
-
-//       // --- Load cookies ---
-//       try {
-//         if (fs.existsSync(cookiesPath)) {
-//           const cookies = JSON.parse(fs.readFileSync(cookiesPath, "utf8"));
-//           if (Array.isArray(cookies) && cookies.length) {
-//             await page.setCookie(...cookies);
-//           }
-//         }
-//       } catch (e) {
-//         console.warn("[task] failed to set cookies:", (e as any).message);
-//       }
-
-//       // --- Safe navigation ---
-//       const tryGoto = async () => {
-//         try {
-//           await page.goto(url, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT });
-//         } catch (e) {
-//           console.warn("[task] goto failed, retrying with domcontentloaded:", e.message);
-//           await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT * 2 });
-//         }
-//       };
-//       await tryGoto();
-
-//       // --- Auto-select UAE if needed ---
-//       if (page.url().includes("/select-country")) {
-//         console.log("[task] Detected /select-country page — auto-selecting UAE...");
-//         try {
-//           await page.waitForSelector('[data-testid="country-select"]', { timeout: 10000 });
-//           await page.waitForSelector('[data-testid="country-select-btn"]', { timeout: 10000 });
-
-//           await page.select('[data-testid="country-select"]', "United Arab Emirates");
-//           await page.click('[data-testid="country-select-btn"]');
-//           await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 });
-
-//           const cookies = await page.cookies();
-//           fs.writeFileSync(cookiesPath, JSON.stringify(cookies, null, 2), "utf8");
-//           console.log("[task] UAE selected & cookies saved.");
-
-//           await tryGoto();
-//         } catch (err: any) {
-//           console.error("[task] Auto-select UAE failed:", err.message);
-//           return false;
-//         }
-//       }
-
-//       // --- Handle redirects ---
-//       page.on("framenavigated", async (frame) => {
-//         const u = frame.url();
-//         if (u.includes("partner.trendyol.com")) {
-//           console.warn("[task] Redirect detected; navigating back.");
-//           await tryGoto();
-//         }
-//       });
-
-//       // --- Extract product data ---
-//       const result = await page.evaluate(() => {
-//         const getText = (sel) => {
-//           const el = document.querySelector(sel);
-//           return el ? el.textContent.trim() : null;
-//         };
-//         const title = getText("h1.pr-new-br, h1.product-title, h1");
-//         const salePrice = getText("div.pr-bx-nm span.prc-slg, div.p-strikethrough-price");
-//         const seller =
-//           getText("div.store-link-header, div.merchant-name, .merchant, a[href*='/sellers/']") ||
-//           getText("a.store-link");
-//         return { title, salePrice, seller, url: window.location.href };
-//       });
-
-//       return result;
-//     });
-
-//     // ----- Graceful shutdown -----
-//     process.on("SIGINT", async () => {
-//       console.log("[scraper] SIGINT — closing cluster...");
-//       if (clusterInstance) await clusterInstance.close();
-//       process.exit(0);
-//     });
-
-//     console.log("[scraper] Puppeteer Cluster initialized.");
-//     return clusterInstance;
-//   } catch (err) {
-//     clusterInitInProgress = false;
-//     console.error("[initCluster] Failed to launch cluster:", err);
-//     throw err;
-//   } finally {
-//     clusterInitInProgress = false;
-//   }
-// }
-*/
-
 async function scrapeProductWithCluster(url: string) {
   const cluster = await initCluster();
   // console.log("[scrapeProductWithCluster] scraping", url, "...", "CLUSTER", cluster);
@@ -535,10 +375,13 @@ async function processProducts(
   const results: any[] = [];
 
   const excludedProducts = await ExcludedProduct.find({}, "productCode").lean();
-  const excludedCodes = new Set(excludedProducts.map((p) => p.productCode));
+
+  const excludedCodes = new Set(
+    excludedProducts.map((p) => String(p.productCode).trim().toLowerCase())
+  );
 
   const filteredProducts = products.filter(
-    (p) => !excludedCodes.has(p.productCode)
+    (p) => !excludedCodes.has(String(p.productCode).trim().toLowerCase())
   );
 
   if (filteredProducts.length === 0) {
@@ -865,7 +708,7 @@ async function scheduledJob() {
       try {
         if (!r || !r.productCode) continue; // skip invalid results
 
-        await Product.findOneAndUpdate(
+        let newProduct = await Product.findOneAndUpdate(
           { productCode: r.productCode }, // or productCode, depending on your ID mapping
           {
             $set: {
@@ -887,17 +730,29 @@ async function scheduledJob() {
           r.buyBox !== "Yes" &&
           r.barcode &&
           r.salePrice &&
-          r.error === null
+          r.error === null &&
+          r.merchant !== "Unknown"
         ) {
-          const competitivePrice = Number((r.salePrice - 0.1).toFixed(2)); // undercut by $0.10
-          console.log(
-            `[scheduler] updating price for productCode=${r.productCode}, sku=${r.sku} to ${competitivePrice}`
+          const existingProduct = await Product.findOne({
+            productCode: r.productCode,
+          }).lean();
+
+          if (!existingProduct || !existingProduct.salePrice) {
+            console.warn(
+              `[scheduler] No existing product or price found for ${r.productCode}`
+            );
+            continue;
+          }
+
+          // Reduce actual product price by 10%
+          const competitivePrice = Number(
+            (existingProduct.salePrice * 0.9).toFixed(2)
           );
-          // barcode,
-          // newPrice,
-          // quantity,
-          // product_id,
-          // productCode
+
+          console.log(
+            `[scheduler] updating price for productCode=${r.productCode}, sku=${r.sku} from ${existingProduct.salePrice} → ${competitivePrice}`
+          );
+
           await handleUpdatePrice(
             r.barcode,
             competitivePrice,
